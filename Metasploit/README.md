@@ -1,3 +1,5 @@
+Credit to Nima Saed: https://medium.com/@nima.saed/metasploit-framework-console-on-docker-with-workspace-fc39f0f2a078
+
 First, create a directory in your home directory for MSF files. You also need a directory to keep Postgres data, let’s keep it in the same place with MSF files.
 
 ```
