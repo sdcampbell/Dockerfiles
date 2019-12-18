@@ -1,5 +1,5 @@
 # CrackMapExec-Docker
-Run CrackMapExec in Docker. Includes lsassy with the lsassy CrackMapExec module integration.
+Run CrackMapExec in Docker. Includes lsassy (https://github.com/Hackndo/lsassy) with the lsassy CrackMapExec module integration.
 
 First, ensure that you have procdump.exe and procdump64.exe (from Microsoft) in the same folder as the Dockerfile.
 
