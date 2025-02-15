@@ -1,5 +1,5 @@
 FROM kalilinux/kali-rolling:latest
-RUN apt update && apt install -y git python3 python3-pip curl wget libpcap-dev
+RUN apt update && apt install -y git python3 python3-pip curl wget libpcap-dev nmap masscan
 RUN apt-get clean
 # Get architecture
 ARG TARGETPLATFORM
