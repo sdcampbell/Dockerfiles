@@ -1,7 +1,7 @@
 alias nuclei='nuclei -nc -silent'
 alias httpx='httpx -nc -silent'
-alias httpx='mapcidr -silent'
-alias httpx='naabu -nc -silent'
+alias mapcidr='mapcidr -silent'
+alias naabu='naabu -nc -silent'
 export PATH=$PATH:/usr/local/go/bin
 export PATH=$PATH:$HOME/go/bin
 export PATH=$PATH:$HOME/.pdtm/go/bin
