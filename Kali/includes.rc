@@ -1,0 +1,126 @@
+alias nuclei='nuclei -nc -silent'
+alias httpx='httpx -nc -silent'
+alias httpx='mapcidr -silent'
+alias httpx='naabu -nc -silent'
+export PATH=$PATH:/usr/local/go/bin
+export PATH=$PATH:$HOME/go/bin
+export PATH=$PATH:$HOME/.pdtm/go/bin
+
+resolve() {
+    # This function takes a domain as input and returns the IP address.
+    while IFS= read -r line; do
+            dig +short "$line" 2> /dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1
+    done
+}
+
+rootdomain() {
+    # This function takes a subdomain as input and returns the root domain.
+    while IFS= read -r line; do
+            echo "$line" | awk -F. '
+            {
+                n = split($0, parts, ".");
+                if (n >= 3 && (parts[n-1] ~ /^(com|net|org|co|gov|edu|mil|int)$/ && parts[n] ~ /^[a-z]{2}$/)) {
+                    print parts[n-2] "." parts[n-1] "." parts[n];
+                } else if (n >= 2) {
+                    print parts[n-1] "." parts[n];
+                } else {
+                    print $0;
+                }
+            }'
+    done
+}
+
+org() {
+    # This function takes an IP address as input and returns the organization name that owns the IP block.
+    while IFS= read -r line; do
+        whois "$line" | grep OrgName | tr -s ' ' | cut -d ' ' -f 2-
+    done
+}
+
+mdi() {
+    # This function takes a domain as input and checks MDI and returns domains using the same tenant.
+    while IFS= read -r line; do
+        body="<?xml version=\"1.0\" encoding=\"utf-8\"?>
+    <soap:Envelope xmlns:exm=\"http://schemas.microsoft.com/exchange/services/2006/messages\" 
+        xmlns:ext=\"http://schemas.microsoft.com/exchange/services/2006/types\" 
+        xmlns:a=\"http://www.w3.org/2005/08/addressing\" 
+        xmlns:soap=\"http://schemas.xmlsoap.org/soap/envelope/\" 
+        xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\">
+    <soap:Header>
+        <a:RequestedServerVersion>Exchange2010</a:RequestedServerVersion>
+        <a:MessageID>urn:uuid:6389558d-9e05-465e-ade9-aae14c4bcd10</a:MessageID>
+        <a:Action soap:mustUnderstand=\"1\">http://schemas.microsoft.com/exchange/2010/Autodiscover/Autodiscover/GetFederationInformation</a:Action>
+        <a:To soap:mustUnderstand=\"1\">https://autodiscover.byfcxu-dom.extest.microsoft.com/autodiscover/autodiscover.svc</a:To>
+        <a:ReplyTo>
+        <a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address>
+        </a:ReplyTo>
+    </soap:Header>
+    <soap:Body>
+        <GetFederationInformationRequestMessage xmlns=\"http://schemas.microsoft.com/exchange/2010/Autodiscover\">
+        <Request>
+            <Domain>${line}</Domain>
+        </Request>
+        </GetFederationInformationRequestMessage>
+    </soap:Body>
+    </soap:Envelope>"
+
+    # Perform the HTTP POST request using curl and store the response
+    response=$(curl -s -X POST -H "Content-type: text/xml; charset=utf-8" -H "User-agent: AutodiscoverClient" -d "$body" "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc")
+
+    # Check if the response is empty, indicating a failed request
+    if [[ -z "$response" ]]; then
+        echo "[-] get_mdi_domains(): Unable to execute request."
+        exit 1
+    fi
+
+    # Parse the XML response to extract domain names using xmllint
+    mdi_domains=$(echo "$response" | xmllint --xpath '//*[local-name()="Domain"]/text()' -)
+    echo "$mdi_domains"
+    done
+}
+
+dnsrecon() {
+    # Check if the correct number of arguments is provided
+    if [[ $# -ne 1 ]]; then
+        # Print the usage information if the arguments are incorrect
+        echo "You didn't provide a domain as input."
+        echo "Usage: $0 [domain]"
+        exit 1
+    fi
+
+    # Check if chaos API key is set in env.
+    if [[ -z "$CHAOS_KEY" ]]; then
+        echo "No chaos API key found. Set env CHAOS_KEY."
+        exit 1
+    fi
+
+    local domain=$1
+    local domains=''
+    local roots=''
+    
+    # Use the mdi function to get the list of related domains
+    mdi_result=$(mdi <<< "$domain")
+    # If no domains are returned from the mdi funtion, pass input domain directly to chaos api.
+    if [[ -z "$mdi_result" ]]; then
+        # Pass the input domain to chaos api and assign the output to a variable.
+        domains=$(chaos -silent -d "$domain")
+    else
+        # Find all root domains.
+        while IFS= read -r line; do
+            root=$(rootdomain <<< "$line")
+            chaos_domains=$(chaos -silent -d "$root")
+            domains=$(echo -e "$domains\n$chaos_domains")
+        done <<< "$mdi_result"
+        # Unique the domains.
+        #domains=$(echo "$domains" | grep . | grep -v \* | sort -u)
+    fi
+    # Process the function output.
+    echo "$domains" | while IFS= read -r line; do
+        ip=$(resolve <<< "$line")
+        if [[ -z "$ip" ]]; then
+            continue
+        fi
+        orgname=$(org <<< "$ip")
+        echo "$line;$ip;$orgname"
+    done
+}
