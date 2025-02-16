@@ -1,4 +1,6 @@
 FROM kalilinux/kali-rolling:latest
+COPY ./includes.rc /root
+RUN echo "source /root/includes.rc" >> /root/.bashrc
 RUN apt update && apt install -y git python3 python3-pip curl wget libpcap-dev nmap masscan tmux libxml2-utils whois
 RUN apt-get clean
 # Get architecture
