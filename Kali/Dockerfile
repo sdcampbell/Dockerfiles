@@ -26,5 +26,3 @@ RUN /usr/local/go/bin/go install -v github.com/projectdiscovery/pdtm/cmd/pdtm@la
 
 RUN /root/.pdtm/go/bin/nuclei -ut
 ENV PATH=$PATH:/usr/local/go/bin:/root/go/bin:/root/.local/bin:/root/.pdtm/go/bin
-# Add Claude Code 
-# Add CloudPEASS
